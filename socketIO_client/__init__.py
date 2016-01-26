@@ -79,7 +79,7 @@ class BaseNamespace(object):
         """
         callback, args = find_callback(args)
         if callback:
-            callback(*args)
+            callback(args)
 
     def on_error(self, reason, advice):
         'Called after server sends an error; you can override this method'
@@ -117,7 +117,7 @@ class BaseNamespace(object):
         return getattr(
             self,
             'on_' + event.replace(' ', '_'),
-            lambda *args: self.on_event(event, *args))
+            lambda *args: self.on_event(event, args))
 
 
 class LoggingNamespace(BaseNamespace):
@@ -148,7 +148,7 @@ class LoggingNamespace(BaseNamespace):
             arguments.append('callback(*args)')
         self._log(logging.INFO, '%s [event] %s(%s)', self.path, event,
                   ', '.join(arguments))
-        super(LoggingNamespace, self).on_event(event, *args)
+        super(LoggingNamespace, self).on_event(event, args)
 
     def on_error(self, reason, advice):
         self._log(logging.INFO, '%s [error] %s', self.path, advice)
@@ -422,26 +422,27 @@ class SocketIO(object):
 
     def _on_message(self, packet, find_event_callback):
         code, packet_id, path, data = packet
-        args = [data]
+        args = data
+        self._send_args('message', args, path, packet_id, find_event_callback)
+
+    def _send_args(self, event, args, path, packet_id, find_event_callback):
+        ev_args = [args]
         if packet_id:
-            args.append(self._prepare_to_send_ack(path, packet_id))
-        find_event_callback('message')(*args)
+            ack = self._prepare_to_send_ack(path, packet_id)
+            ev_args.append(ack)
+        find_event_callback(event)(*ev_args)
 
     def _on_json(self, packet, find_event_callback):
         code, packet_id, path, data = packet
-        args = [json.loads(data)]
-        if packet_id:
-            args.append(self._prepare_to_send_ack(path, packet_id))
-        find_event_callback('message')(*args)
+        args = json.loads(data)
+        self._send_args('message', args, path, packet_id, find_event_callback)
 
     def _on_event(self, packet, find_event_callback):
         code, packet_id, path, data = packet
         value_by_name = json.loads(data)
         event = value_by_name['name']
         args = value_by_name.get('args', [])
-        if packet_id:
-            args.append(self._prepare_to_send_ack(path, packet_id))
-        find_event_callback(event)(*args)
+        self._send_args(event, args, path, packet_id, find_event_callback)
 
     def _on_ack(self, packet, find_event_callback):
         code, packet_id, path, data = packet
@@ -452,7 +453,7 @@ class SocketIO(object):
         except KeyError:
             return
         args = json.loads(data_parts[1]) if len(data_parts) > 1 else []
-        ack_callback(*args)
+        ack_callback(args)
 
     def _on_error(self, packet, find_event_callback):
         code, packet_id, path, data = packet
