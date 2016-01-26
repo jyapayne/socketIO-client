@@ -274,7 +274,7 @@ class SocketIO(object):
 
     def _process_packet(self, packet):
         code, packet_id, path, data = packet
-        namespace = self.get_namespace(path)
+        namespace = self.get_namespace(path or '')
         delegate = self._get_delegate(code)
         delegate(packet, namespace._find_event_callback)
 
