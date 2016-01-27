@@ -315,7 +315,7 @@ class SocketIO(object):
         try:
             if self.connected:
                 return self.__transport
-        except AttributeError:
+        except AttributeError as e:
             pass
         socketIO_session = self._get_socketIO_session()
         supported_transports = self._get_supported_transports(socketIO_session)
@@ -396,21 +396,18 @@ class SocketIO(object):
             raise PacketError('unhandled namespace path (%s)' % path)
 
     def _get_delegate(self, code):
-        try:
-            return {
-                '0': self._on_disconnect,
-                '1': self._on_connect,
-                '2': self._on_heartbeat,
-                '3': self._on_message,
-                '4': self._on_json,
-                '5': self._on_event,
-                '6': self._on_ack,
-                '7': self._on_error,
-                '8': self._on_noop,
-                '': self._on_noop
-            }[code]
-        except KeyError:
-            raise PacketError('unexpected code (%s)' % code)
+        return {
+            '0': self._on_disconnect,
+            '1': self._on_connect,
+            '2': self._on_heartbeat,
+            '3': self._on_message,
+            '4': self._on_json,
+            '5': self._on_event,
+            '6': self._on_ack,
+            '7': self._on_error,
+            '8': self._on_noop,
+            '': self._on_noop
+        }.get(code, self._on_noop)
 
     def _on_disconnect(self, packet, find_event_callback):
         find_event_callback('disconnect')()
