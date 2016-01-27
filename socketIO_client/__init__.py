@@ -275,7 +275,7 @@ class SocketIO(object):
     def _process_packet(self, packet):
         code, packet_id, path, data = packet
         namespace = self.get_namespace(path or '')
-        delegate = self._get_delegate(code)
+        delegate = self._get_delegate(code, packet)
         delegate(packet, namespace._find_event_callback)
 
     def _stop_waiting(self, for_callbacks):
@@ -395,19 +395,22 @@ class SocketIO(object):
         except KeyError:
             raise PacketError('unhandled namespace path (%s)' % path)
 
-    def _get_delegate(self, code):
-        return {
-            '0': self._on_disconnect,
-            '1': self._on_connect,
-            '2': self._on_heartbeat,
-            '3': self._on_message,
-            '4': self._on_json,
-            '5': self._on_event,
-            '6': self._on_ack,
-            '7': self._on_error,
-            '8': self._on_noop,
-            '': self._on_noop
-        }.get(code, self._on_noop)
+    def _get_delegate(self, code, packet):
+        try:
+            return {
+                '0': self._on_disconnect,
+                '1': self._on_connect,
+                '2': self._on_heartbeat,
+                '3': self._on_message,
+                '4': self._on_json,
+                '5': self._on_event,
+                '6': self._on_ack,
+                '7': self._on_error,
+                '8': self._on_noop,
+                '': self._on_noop
+            }[code]
+        except KeyError:
+            raise PacketError('unexpected code ({}): {}'.format([code], packet))
 
     def _on_disconnect(self, packet, find_event_callback):
         find_event_callback('disconnect')()

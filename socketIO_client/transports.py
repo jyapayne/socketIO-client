@@ -8,6 +8,7 @@ import socket
 import sys
 import time
 import websocket
+import re
 
 from .exceptions import ConnectionError, TimeoutError
 from .symmetries import _get_text
@@ -97,22 +98,34 @@ class _AbstractTransport(object):
                 yield self._packets.pop(0)
         except IndexError:
             pass
-        for packet_text in self.recv(timeout=timeout):
-            self._log(logging.DEBUG, '[packet received] %s', packet_text)
-            try:
-                packet_parts = packet_text.split(':', 3)
-            except AttributeError:
-                self._log(logging.WARNING, '[packet error] %s', packet_text)
-                continue
-            code, packet_id, path, data = None, None, None, None
-            packet_count = len(packet_parts)
-            if 4 == packet_count:
-                code, packet_id, path, data = packet_parts
-            elif 3 == packet_count:
-                code, packet_id, path = packet_parts
-            elif 1 == packet_count:
-                code = packet_parts[0]
-            yield code, packet_id, path, data
+        for packet_texts in self.recv(timeout=timeout):
+            #remove packet separator
+            packet_texts = re.sub('^\xef\xbf\xbd\w+\xef\xbf\xbd', '',
+                                  packet_texts)
+
+            packets = packet_texts.split('\xef\xbf\xbd')[::2]
+
+            for packet_text in packets:
+                self._log(logging.DEBUG, '[packet received] %s', packet_text)
+                sep_count = packet_text.count('\xef\xbf\xbd')/2
+
+                try:
+                    packet_parts = packet_text.split(':', 3)
+                except AttributeError:
+                    self._log(logging.WARNING, '[packet error] %s', packet_text)
+                    continue
+                code, packet_id, path, data = None, None, None, None
+                packet_count = len(packet_parts)
+                if 4 == packet_count:
+                    code, packet_id, path, data = packet_parts
+                elif 3 == packet_count:
+                    code, packet_id, path = packet_parts
+                elif 1 == packet_count:
+                    code = packet_parts[0]
+                if code and len(code) > 1:
+                    code = code[-1]
+
+                yield code, packet_id, path, data
 
     def _enqueue_packet(self, packet):
         self._packets.append(packet)
