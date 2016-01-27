@@ -407,6 +407,7 @@ class SocketIO(object):
                 '6': self._on_ack,
                 '7': self._on_error,
                 '8': self._on_noop,
+                '': self._on_noop
             }[code]
         except KeyError:
             raise PacketError('unexpected code (%s)' % code)

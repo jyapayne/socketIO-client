@@ -85,6 +85,8 @@ class _AbstractTransport(object):
     def send_packet(self, code, path='', data='', callback=None):
         packet_id = self.set_ack_callback(callback) if callback else ''
         packet_parts = str(code), packet_id, path, encode_unicode(data)
+        if not data:
+            packet_parts = packet_parts[:-1]
         packet_text = ':'.join(packet_parts)
         self.send(packet_text)
         self._log(logging.DEBUG, '[packet sent] %s', packet_text)
@@ -143,6 +145,8 @@ class _WebsocketTransport(_AbstractTransport):
         http_session = _prepare_http_session(kw)
         req = http_session.prepare_request(requests.Request('GET', url))
         headers = ['%s: %s' % item for item in req.headers.items()]
+        headers.append('Connection: keep-alive')
+
         try:
             self._connection = websocket.create_connection(url, header=headers)
         except socket.timeout as e:
@@ -318,10 +322,10 @@ def _get_response(request, *args, **kw):
         response = request(*args, **kw)
     except requests.exceptions.Timeout as e:
         raise TimeoutError(e)
-    except requests.exceptions.ConnectionError as e:
-        raise ConnectionError(e)
     except requests.exceptions.SSLError as e:
         raise ConnectionError('could not negotiate SSL (%s)' % e)
+    except requests.exceptions.ConnectionError as e:
+        raise ConnectionError(e)
     status = response.status_code
     if 200 != status:
         raise ConnectionError('unexpected status code (%s)' % status)
