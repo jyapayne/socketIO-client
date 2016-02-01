@@ -237,7 +237,7 @@ class SocketIO(object):
         callback, args = find_callback(args, kw)
         self._transport.emit(path, event, args, callback)
 
-    def wait(self, seconds=None, for_callbacks=False, raise_error=False):
+    def wait(self, seconds=None, for_callbacks=False, on_error=None, error_args=None):
         """Wait in a loop and process events as defined in the namespaces.
 
         - Omit seconds, i.e. call wait() without arguments, to wait forever.
@@ -254,8 +254,8 @@ class SocketIO(object):
                     pass
                 next(self._heartbeat_pacemaker)
             except ConnectionError as e:
-                if raise_error:
-                    raise
+                if on_error is not None and callable(on_error):
+                    on_error(e, error_args)
                 try:
                     warning = Exception('[connection error] %s' % e)
                     warning_screen.throw(warning)
